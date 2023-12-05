@@ -183,11 +183,11 @@ pub fn part2(input: &str) -> crate::Result<i64> {
         }
         seeds = tmp;
     }
-    seeds.sort_by_key(|seed| seed.start);
     Ok(seeds
-        .get(0)
-        .ok_or(crate::Error::boxed(Error::InvalidInput))?
-        .start)
+        .into_iter()
+        .map(|s| s.start)
+        .min()
+        .ok_or(crate::Error::boxed(Error::InvalidInput))?)
 }
 
 #[cfg(test)]
