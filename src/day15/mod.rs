@@ -17,34 +17,18 @@ pub fn part1(input: &str) -> crate::Result<usize> {
 pub fn part2(input: &str) -> crate::Result<usize> {
     let mut boxes: [Vec<(String, u32)>; 256] = array::from_fn(|_| Vec::new());
     for instr in input.split(',') {
-        let mut label = String::new();
-        let mut op = None;
-        let mut focal_length = None;
-        for c in instr.chars() {
-            if c.is_ascii_alphabetic() {
-                label.push(c);
-            } else if c.is_ascii_punctuation() {
-                op = Some(c);
+        if let Some((label, focal_length)) = instr.split_once('=') {
+            let lens_box = &mut boxes[hash(label)];
+            if let Some(lens) = lens_box.iter_mut().find(|(l, _)| l == label) {
+                lens.1 = focal_length.parse()?;
             } else {
-                focal_length = c.to_digit(10);
+                lens_box.push((label.to_string(), focal_length.parse()?));
             }
-        }
-        let op = op.ok_or(crate::Error::boxed(Error::InvalidInput))?;
-
-        let lens_box = &mut boxes[hash(&label)];
-        match op {
-            '=' => {
-                let focal_length = focal_length.ok_or(crate::Error::boxed(Error::InvalidInput))?;
-                if let Some(lens) = lens_box.iter_mut().find(|(l, _)| l == &label) {
-                    lens.1 = focal_length;
-                } else {
-                    lens_box.push((label, focal_length));
-                }
-            }
-            '-' => {
-                lens_box.retain(|(l, _)| l != &label);
-            }
-            _ => return Err(crate::Error::boxed(Error::InvalidInput)),
+        } else if let Some((label, _)) = instr.split_once('-') {
+            let lens_box = &mut boxes[hash(label)];
+            lens_box.retain(|(l, _)| l != label);
+        } else {
+            return Err(crate::Error::boxed(Error::InvalidInput));
         }
     }
 
