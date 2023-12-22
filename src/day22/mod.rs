@@ -13,9 +13,6 @@ struct Line {
 
 impl Line {
     fn new(from: Vec3, to: Vec3) -> Self {
-        assert!(from.0 <= to.0);
-        assert!(from.1 <= to.1);
-        assert!(from.2 <= to.2);
         Line { from, to }
     }
 
@@ -27,7 +24,6 @@ impl Line {
     }
 
     fn adjacent_z(&self, offset: i32) -> Line {
-        assert!(self.from.2 > 0);
         if self.from.2 != self.to.2 {
             // vertical
             let z = if offset > 0 {
@@ -97,8 +93,8 @@ impl Bricks {
         fallen
     }
 
-    fn adjacent_z(&self, brick: &Line, offset: i32) -> HashSet<usize> {
-        brick
+    fn adjacent_z(&self, idx: usize, offset: i32) -> HashSet<usize> {
+        self.bricks[idx]
             .adjacent_z(offset)
             .points()
             .filter_map(|p| self.lookup.get(&p))
@@ -106,30 +102,33 @@ impl Bricks {
             .collect::<HashSet<usize>>()
     }
 
-    fn disintegratable(&self) -> usize {
-        let supports: Vec<usize> = self
-            .bricks
-            .iter()
-            .map(|brick| self.adjacent_z(brick, -1).len())
+    fn count_supported(&self, idx: usize) -> usize {
+        let mut supports: Vec<HashSet<usize>> = (0..self.bricks.len())
+            .map(|brick| self.adjacent_z(brick, -1))
             .collect();
-        assert!(supports.len() == self.bricks.len());
-
-        self.bricks
-            .iter()
-            .map(|brick| {
-                self.adjacent_z(brick, 1)
-                    .into_iter()
-                    .all(|idx| supports[idx] > 1)
-            })
-            .filter(|b| *b)
-            .count()
-    }
-
-    fn disintegrate(&mut self, idx: usize) {
-        for p in self.bricks[idx].points() {
-            self.lookup.remove(&p);
+        for support in &mut supports {
+            support.retain(|i| i != &idx);
         }
-        self.bricks.remove(idx);
+
+        let mut cnt = 0;
+        let mut supported = self.adjacent_z(idx, 1);
+        supported.retain(|idx| supports[*idx].is_empty());
+        while !supported.is_empty() {
+            cnt += supported.len();
+
+            for idx in &supported {
+                for support in &mut supports {
+                    support.retain(|i| i != idx);
+                }
+            }
+
+            supported = supported
+                .into_iter()
+                .flat_map(|idx| self.adjacent_z(idx, 1))
+                .filter(|idx| supports[*idx].is_empty())
+                .collect();
+        }
+        cnt
     }
 }
 
@@ -153,17 +152,17 @@ fn parse(input: &str) -> Bricks {
 pub fn part1(input: &str) -> crate::Result<usize> {
     let mut bricks = parse(input);
     bricks.fall();
-    Ok(bricks.disintegratable())
+    let disintegratable = (0..bricks.bricks.len())
+        .filter(|idx| bricks.count_supported(*idx) == 0)
+        .count();
+    Ok(disintegratable)
 }
 
 pub fn part2(input: &str) -> crate::Result<usize> {
     let mut bricks = parse(input);
     bricks.fall();
-    let mut sum = 0;
-    for idx in 0..bricks.bricks.len() {
-        let mut bricks = bricks.clone();
-        bricks.disintegrate(idx);
-        sum += bricks.fall().len();
-    }
+    let sum = (0..bricks.bricks.len())
+        .map(|idx| bricks.count_supported(idx))
+        .sum();
     Ok(sum)
 }
